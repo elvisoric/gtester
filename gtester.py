@@ -7,14 +7,13 @@ from pathlib import Path
 
 gcolor = "--gtest_color=yes"
 gtest_args = [gcolor]
-exe = ""
 
 failed_indicator = "[  FAILED  ] "
 passed_indicator = "[  PASSED  ] "
 summary_indicator = "[==========] "
 config_path_prefix = Path(".gtester")
 config_name = "config.json"
-config_path_prefix.mkdir(exist_ok = True)
+config_path_prefix.mkdir(exist_ok=True)
 config_path = (config_path_prefix / config_name)
 
 test_suit_separator = "] \x1b[m"
@@ -22,10 +21,8 @@ test_suit_separator = "] \x1b[m"
 failing_flag = "--run_failing"
 exe_flag = "--exe"
 
-def run_tests(tests = dict(), override_failing_storage = True):
-    if len(exe) == 0:
-        print("Please provide exe using --exe");
-        return
+
+def run_tests(exe, tests=dict(), override_failing_storage=True):
     check_for_failed = True
     tag_test = False
     skip_first_failed_tag = True
@@ -36,7 +33,8 @@ def run_tests(tests = dict(), override_failing_storage = True):
 
     gtest_args.append('--gtest_filter=' + gtest_filter)
     args = [exe] + gtest_args
-    popen = subprocess.Popen(" ".join(args), shell = True,stdout=subprocess.PIPE, universal_newlines=True)
+    popen = subprocess.Popen(" ".join(args), shell=True,
+                             stdout=subprocess.PIPE, universal_newlines=True)
     tests_output = dict()
     count = 1
     for line in popen.stdout:
@@ -48,7 +46,7 @@ def run_tests(tests = dict(), override_failing_storage = True):
             print(pl)
         if tag_test and not check_for_failed and failed_indicator in pl:
             p = pl.find(test_suit_separator)
-            test_str = pl[p + len(test_suit_separator) :]
+            test_str = pl[p + len(test_suit_separator):]
             if skip_first_failed_tag:
                 skip_first_failed_tag = False
                 print(pl)
@@ -61,7 +59,7 @@ def run_tests(tests = dict(), override_failing_storage = True):
                         indicator_count = k
                         break
 
-            indicator = '\33[91m' +'[' + str(indicator_count) + '] ' + '\033[0m'
+            indicator = '\33[91m' + '[' + str(indicator_count) + '] ' + '\033[0m'
 
             print(pl + " " + indicator)
             tests_output[str(indicator_count)] = test_str
@@ -69,60 +67,61 @@ def run_tests(tests = dict(), override_failing_storage = True):
         else:
             print(pl)
 
-    if override_failing_storage :
-        output = dict();
+    if override_failing_storage:
+        output = dict()
         output['exe'] = exe
         output['tests'] = tests_output
         f = open(config_path, "w")
         f.write(json.dumps(output))
         f.close()
 
+
 def run_all_tests():
-    global exe
     if config_path.exists():
         with open(config_path) as f:
             config_data = json.load(f)
         exe = config_data['exe']
-    run_tests()
+        run_tests(exe)
+    else:
+        print("Please provide exe using --exe")
 
-def run_failed_tests():
-    with open(config_path) as f:
-        config_data = json.load(f)
-    exe = config_data['exe']
-    tests = config_data['tests']
-    run_tests(tests,False)
 
-def run_specific_failed_tests(tests):
-    global exe
+def run_failed_tests(exe, tests):
+    run_tests(exe, tests, False)
+
+
+def run_specific_failed_tests(specified_tests):
+    if not config_path.exists():
+        print("Please provide exe using --exe")
+        return
     with open(config_path) as f:
         config_data = json.load(f)
     exe = config_data['exe']
     data = config_data['tests']
-    filter_tests = dict()
-    for test in tests:
+    filtered_tests = dict()
+    for test in specified_tests:
         if test in data.keys():
-            filter_tests[test] = data[test]
-    if len(filter_tests) == 0:
-        run_failed_tests();
+            filtered_tests[test] = data[test]
+    if len(filtered_tests) == 0:
+        run_failed_tests(exe, data)
     else:
-        run_tests(filter_tests,False )
+        run_tests(exe, filtered_tests, False)
+
 
 def process_tests():
     if exe_flag in sys.argv:
         exe = sys.argv[sys.argv.index(exe_flag) + 1]
-        output = dict();
+        output = dict()
         output['exe'] = exe
         output['tests'] = dict()
         f = open(config_path, "w")
         f.write(json.dumps(output))
         f.close()
     elif failing_flag in sys.argv:
-        tests =sys.argv[sys.argv.index(failing_flag)+1:]
+        tests = sys.argv[sys.argv.index(failing_flag)+1:]
         run_specific_failed_tests(tests)
     else:
         run_all_tests()
 
 
 process_tests()
-
-
